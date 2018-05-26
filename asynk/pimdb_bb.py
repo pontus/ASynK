@@ -235,7 +235,7 @@ class MessageStore:
         return None
 
     def _set_default_preamble (self):
-        ver = '7'
+        ver = '9'
         self.append_preamble(';; -*-coding: utf-8-emacs;-*-\n')
         self.append_preamble(';;; file-format: %s\n' % ver)
         self.set_file_format(ver)
@@ -283,7 +283,8 @@ class MessageStore:
 
                 try:
                     c  = BBContact(def_f, rec=ff.rstrip())
-                except BBDBParseError, e:
+                #except BBDBParseError, e:
+		except IOError,e:
                     logging.error('Could not parse BBDB record: %s', ff)
 
                     raise BBDBFileFormatError(('Cannot proceed with '
@@ -433,6 +434,7 @@ class BBPIMDB(PIMDB):
         self.set_regexes({})
         self._set_regexes_ver6()
         self._set_regexes_ver7()
+        self._set_regexes_ver9()	
 
         self.set_msgstores({})
         def_ms = self.add_msgstore(def_fn)
@@ -736,6 +738,69 @@ class BBPIMDB(PIMDB):
             'note_re' : res['note'],
             'notes_re' : res['notes'],
             })
+
+    def _set_regexes_ver9 (self):
+        res = {'string' : r'"[^"\\]*(?:\\.[^"\\]*)*"|nil',
+               'ws'     : '\s*'}
+        re_str_ar = 'nil|\(((' + res['string'] + ')' + res['ws'] + ')*\)'
+        res.update({'string_array' : re_str_ar})
+
+        ## Phones
+        re_ph_vec = ('\[\s*((?P<phlabel>' + res['string'] + 
+                     ')\s*(?P<number>(?P<unstructured>'  +
+                     res['string'] + ')|'+
+                     '(?P<structured>\d+\s+\d+\s+\d+\s+.+)' +
+                     '\s*))\]')
+        re_phs = 'nil|(\(\s*(' + re_ph_vec + '\s*)+)\)'
+        res.update({'ph_vec' : re_phs})
+
+        ## Addresses
+        re_ad_vec = ('\[\s*(?P<adlabel>' + res['string'] + ')\s*(' +
+                     '(?P<streets>' + res['string_array'] + ')\s*' +
+                     '(?P<city>'    + res['string'] + ')\s*' +
+                     '(?P<state>'   + res['string'] + ')\s*' +
+                     '(?P<zip>('    + res['string'] + ')|(' + '\d\d\d\d\d))\s*' +
+                     '(?P<country>' + res['string'] + ')' +
+                     ')\s*\]')
+        re_ads = 'nil|\(\s*(' + re_ad_vec + '\s*)+\)'
+        res.update({'ad_vec' : re_ads})
+
+
+        re_note = ('\((?P<field>[^()]+)\s*\.\s*(?P<value>' +
+                   res['string'] + '|\d+)+\)')
+        re_notes = '\(\s*(' + re_note + '\s*)+\)'
+        res.update({'note'  : re_note})
+        res.update({'notes' : re_notes})
+
+        ## A full contact entry
+        re_con = ('\[\s*' +
+                  '(?P<firstname>' + res['string']       + ')\s*' +
+                  '(?P<lastname>'  + res['string']       + ')\s*' +
+                  '(?P<affix>'     + res['string_array'] + ')\s*' +
+                  '(?P<aka>'       + res['string_array'] + ')\s*' +
+                  '(?P<company>'   + res['string_array'] + ')\s*' +
+                  '(?P<phones>'    + res['ph_vec']       + ')\s*' +
+                  '(?P<addrs>'     + res['ad_vec']       + ')\s*' +
+                  '(?P<emails>'    + res['string_array'] + ')\s*' +
+                  '(?P<notes>nil|'     + res['notes']        + ')\s*' +
+                  '(?P<uuid>'      + res['string']        + ')\s*' +
+                  '(?P<creationdate>'      + res['string']        + ')\s*' +
+                  '(?P<timestamp>'      + res['string']        + ')\s*' +				  
+                  '(?P<cache>'     + res['string']       + ')\s*' +
+                  '\s*\]')
+        
+        ver = '9'
+
+        ## Now save some of the regexes for later use...
+        self.add_regexes(ver, {
+            'con_re' : re_con,
+            'str_re' : res['string'],
+            'adr_re' : re_ad_vec,
+            'ph_re'  : re_ph_vec,
+            'note_re' : res['note'],
+            'notes_re' : res['notes'],
+            })
+
 
     ##
     ## Now the non-abstract methods and internal methods

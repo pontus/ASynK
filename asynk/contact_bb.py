@@ -139,7 +139,13 @@ class BBContact(Contact):
         self._snarf_postal_from_parse_res(d)
         self._snarf_phones_from_parse_res(d)
         self._snarf_notes_from_parse_res(d)
-
+        
+        if self.get_store().get_file_format() == '9':
+            self._snarf_uuid_from_parse_res(d)
+            self._snarf_creation_date_from_parse_res(d)
+            self._snarf_timestamp_from_parse_res(d)
+            
+        
     def init_rec_from_props (self):
         if self.dirty():
             self.set_updated(pimdb_bb.BBPIMDB.get_bbdb_time())
@@ -151,12 +157,31 @@ class BBContact(Contact):
         rec += self._get_phones_as_string()  + ' '
         rec += self._get_postal_as_string()  + ' '
         rec += self._get_emails_as_string()  + ' '
-        rec += self._get_notes_as_string()
+        rec += self._get_notes_as_string() + ' '
+
+        if self.get_store().get_file_format() == '9':
+            rec += self._get_uuid_as_string() + ' '
+            rec += self._get_creation_date_as_string() + ' '
+            rec += self._get_timestamp_as_string() + ' '
         rec += ' nil]'
 
         self.dirty(False)
         return rec
 
+
+    def _snarf_uuid_from_parse_res (self, pr):
+        n = pr['uuid']
+        self._set_att('itemid', unesc_str(chompq(n)))
+
+    def _snarf_creation_date_from_parse_res (self, pr):
+        n = pr['creationdate']
+        self._set_prop('created', unesc_str(chompq(n)))
+
+    def _snarf_timestamp_from_parse_res (self, pr):
+        n = pr['timestamp']
+        self._set_prop('updated', unesc_str(chompq(n)))
+
+    
     def _snarf_names_from_parse_res (self, pr):
         n = pr['firstname']
         if n and n != 'nil':
@@ -546,7 +571,7 @@ class BBContact(Contact):
 
             comp.insert(0, comp1)
             return unchompq('; '.join(comp))
-        elif ver == '7':
+        elif ver in ('7','9'):
             if comp and len(comp) > 0:
                 comp = demjson.decode(comp)
                 comp.insert(0, unchompq(comp1))
@@ -670,16 +695,23 @@ class BBContact(Contact):
 
         return ret
 
+
+    def _get_uuid_as_string(self):
+        return unchompq(self.get_itemid())
+
+    def _get_creation_date_as_string(self):
+        return  unchompq(self.get_created())
+
+    def _get_timestamp_as_string(self):
+        return unchompq(self.get_updated())
+
     def _get_notes_as_string (self):
         noted = self.get_notes_map()
         if not noted:
             logging.error('_ge(): Error in Config. No notes_map field for bb')
             return
 
-        ret =  '(bbdb-id . %s) ' % unchompq(self.get_itemid())
-        ret += '(%s . %s) ' % (noted['created'], unchompq(self.get_created()))
-        ret += '(%s . %s) ' % (noted['updated'], unchompq(self.get_updated()))
-
+	ret = ''
         p = esc_str(self.get_prefix())
         g = esc_str(self.get_gender())
         t = esc_str(self.get_title())
@@ -716,6 +748,12 @@ class BBContact(Contact):
         if f:
             ret += '(%s . %s) ' % (noted['folder'],  unchompq(f))
 
+        if self.get_store().get_file_format() in ('6', '7'):
+            ret =  '(bbdb-id . %s) ' % unchompq(self.get_itemid())
+            ret += '(%s . %s) ' % (noted['created'], unchompq(self.get_created()))
+            ret += '(%s . %s) ' % (noted['updated'], unchompq(self.get_updated()))
+
+            
         ret += self._get_sync_tags_as_str() + ' '
         ret += self._get_websites_as_string() + ' '
 

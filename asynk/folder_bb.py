@@ -97,6 +97,7 @@ class BBContactsFolder(Folder):
                 sl.add_new(iid)
 
         kss = newi.keys()
+
         for x, y in oldi.iteritems():
             ## FIXME: The following could lead to virtually undebuggable
             ## problem if same item ID is used across two different sources
